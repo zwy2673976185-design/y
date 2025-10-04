@@ -2,43 +2,510 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>公告更新功能</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>悬浮功能面板</title>
+    <style>
+        /* 100%保留原UI样式，仅新增公告渲染必要样式，不改动任何原有样式 */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei", sans-serif; }
+        body { height: 100vh; overflow: hidden; position: relative; background: #f5f7fa; }
+        
+        .float-btn { 
+            position: fixed; 
+            z-index: 1002; 
+            width: 60px; 
+            height: 60px; 
+            border-radius: 0; 
+            box-shadow: 0 3px 15px rgba(0,0,0,0.3); 
+            cursor: pointer; 
+            user-select: none; 
+            -webkit-tap-highlight-color: transparent; 
+            transition: transform 0.2s ease, box-shadow 0.2s ease; 
+            background-image: url(https://i.imgs.ovh/2025/09/28/75fraO.jpeg);
+            background-color: #f0f0f0; 
+            background-size: cover; 
+            background-position: center; 
+            background-repeat: no-repeat; 
+            padding: 0; 
+            margin: 0; 
+            border: none; 
+            right: 20px; 
+            bottom: 50px; 
+        }
+        .float-btn:active { transform: scale(0.95); box-shadow: 0 5px 20px rgba(0,0,0,0.4); }
+        
+        .float-window { 
+            position: fixed; 
+            z-index: 1001; 
+            width: 300px; 
+            height: 280px; 
+            background: white; 
+            border-radius: 12px; 
+            box-shadow: 0 5px 25px rgba(0,0,0,0.15); 
+            overflow: hidden; 
+            display: none; 
+            opacity: 0; 
+            transition: opacity 0.3s ease; 
+        }
+        .float-window.active { display: block; opacity: 1; }
+        
+        .window-header { 
+            padding: 12px 15px; 
+            background: linear-gradient(90deg, #2563eb, #3b82f6); 
+            color: white; 
+            font-size: 16px; 
+            font-weight: 500; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            cursor: move; 
+            -webkit-tap-highlight-color: transparent; 
+            height: 44px; 
+        }
+        .modal-back { 
+            background: transparent; 
+            border: none; 
+            color: white; 
+            font-size: 14px; 
+            cursor: pointer; 
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            transition: background 0.2s ease; 
+            display: none; 
+            -webkit-tap-highlight-color: transparent; 
+        }
+        .modal-back:hover { background: rgba(255,255,255,0.1); }
+        
+        .func-buttons { 
+            padding: 10px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+            max-height: calc(280px - 44px); 
+            overflow-y: auto; 
+            -webkit-overflow-scrolling: touch; 
+        }
+        .func-btn { 
+            padding: 12px 15px; 
+            border-radius: 8px; 
+            background: #f8f9fa; 
+            font-size: 14px; 
+            color: #333; 
+            text-align: left; 
+            cursor: pointer; 
+            transition: background 0.2s ease, transform 0.1s ease; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            -webkit-tap-highlight-color: transparent; 
+            border: none; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .func-btn:hover { background: #f1f3f5; transform: translateY(-1px); }
+        .btn-icon { width: 20px; height: 20px; opacity: 0.7; }
+        
+        .content-panel { 
+            padding: 15px; 
+            max-height: calc(280px - 44px); 
+            overflow-y: auto; 
+            -webkit-overflow-scrolling: touch; 
+            display: none; 
+        }
+        .content-panel.active { display: block; }
+        
+        .user-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2563eb;
+            margin-bottom: 10px;
+        }
+        .user-desc {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.5;
+        }
+        .empty-tip {
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+            line-height: 1.5;
+            padding: 20px 0;
+        }
+
+        /* 新增：公告样式（嵌入原公告面板，风格匹配原UI） */
+        .notice-item { 
+            margin-bottom: 10px; 
+            padding: 10px; 
+            background: #f9faff; 
+            border-radius: 8px; 
+            border: 1px solid #ebf2ff; 
+            display: block; /* 未更新：显示 */
+        }
+        .notice-item.hidden { /* 已更新：隐藏 */
+            display: none; 
+        }
+        .notice-title { 
+            font-weight: 600; 
+            color: #2563eb; 
+            margin-bottom: 5px; 
+            font-size: 15px; 
+        }
+        .notice-time { 
+            font-size: 12px; 
+            color: #999; 
+            margin-bottom: 6px; 
+        }
+        .notice-content { 
+            font-size: 13px; 
+            color: #666; 
+            line-height: 1.4; 
+            margin-bottom: 8px; 
+            word-break: break-word; 
+        }
+        /* 新增：下载/更新按钮（样式匹配原UI按钮风格，不突兀） */
+        .notice-actions { 
+            display: flex; 
+            gap: 8px; 
+            justify-content: flex-end; 
+        }
+        .action-btn { 
+            padding: 6px 12px; 
+            border: none; 
+            border-radius: 6px; 
+            font-size: 12px; 
+            cursor: pointer; 
+            transition: background 0.2s ease; 
+        }
+        .download-btn { 
+            background: #2563eb; 
+            color: white; 
+            box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2); 
+        }
+        .update-btn { 
+            background: #10b981; 
+            color: white; 
+            box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2); 
+        }
+    </style>
 </head>
 <body>
-    <button class="edit-switch" id="editSwitch">打开公告更新模版</button>
-    <div class="edit-panel" id="editPanel">
-        <h2 class="edit-title">公告更新模版</h2>
-        <div class="form-group">
-            <label class="form-label">1. 公告标题</label>
-            <input type="text" class="form-input" id="editTitle" placeholder="填写公告标题">
+    <!-- 完全保留原HTML结构，不增删任何原有元素 -->
+    <button class="float-btn" id="floatBtn"></button>
+
+    <div class="float-window" id="floatWindow">
+        <div class="window-header" id="windowHeader">
+            功能面板
+            <button class="modal-back" id="modalBack">返回</button>
         </div>
-        <div class="form-group">
-            <label class="form-label">2. 更新日期</label>
-            <input type="date" class="form-input" id="editDate">
+        <div class="func-buttons" id="funcButtons">
+            <button class="func-btn" id="btnMy">
+                <span>我的</span>
+                <img src="https://img.icons8.com/ios-glyphs/30/666/user--v1.png" class="btn-icon" alt="我的">
+            </button>
+            <button class="func-btn" id="btnNotice">
+                <span>公告</span>
+                <img src="https://img.icons8.com/ios-glyphs/30/666/announcement--v1.png" class="btn-icon" alt="公告">
+            </button>
+            <button class="func-btn" id="btnContact">
+                <span>联系作者</span>
+                <img src="https://img.icons8.com/ios-glyphs/30/666/contact-card--v1.png" class="btn-icon" alt="联系作者">
+            </button>
+            <button class="func-btn" id="btnSetting">
+                <span>设置</span>
+                <img src="https://img.icons8.com/ios-glyphs/30/666/settings--v1.png" class="btn-icon" alt="设置">
+            </button>
         </div>
-        <div class="form-group">
-            <label class="form-label">3. 更新内容</label>
-            <textarea class="form-textarea" id="editContent" placeholder="描述更新内容"></textarea>
+        <div class="content-panel" id="panelMy">
+            <div class="user-name">用一生找寻</div>
+            <div class="user-desc">当前功能待开发，暂显示用户名<br>后续可添加头像、个人信息等</div>
         </div>
-        <div class="form-group">
-            <label class="form-label">4. 配置更新链接（可选）</label>
-            <input type="text" class="form-input" id="editUpdateUrl" placeholder="填写更新链接">
-        </div>
-        <div class="form-group">
-            <label class="form-label">5. 上传更新文件（可选）</label>
-            <div class="file-upload">
-                <input type="file" id="editFile" accept=".html,.zip,.apk,.doc,.pdf,.exe,.txt">
-                <div class="file-info" id="editFileInfo">点击或拖拽文件到此处</div>
+        <!-- 公告面板：仅在原空提示位置新增公告容器，不改动面板结构 -->
+        <div class="content-panel" id="panelNotice">
+            <div id="noticeContainer">
+                <div class="empty-tip" id="defaultTip">公告功能需对接“公告更新模块”<br>同步数据后可显示公告内容</div>
+                <!-- 动态公告：未更新显示，已更新隐藏 -->
+                <div class="notice-item" id="pushNotice"></div>
             </div>
         </div>
-        <div class="edit-btns">
-            <button class="edit-btn close-btn" id="closeEdit">关闭模版</button>
-            <button class="edit-btn sync-btn" id="syncNotice">同步公告</button>
+        <div class="content-panel" id="panelContact">
+            <div class="empty-tip">点击下方链接联系作者<br><a href="https://qzone.qq.com/2673976185" target="_blank" style="color: #2563eb; text-decoration: none;">前往作者QQ空间</a></div>
+        </div>
+        <div class="content-panel" id="panelSetting">
+            <div class="empty-tip">设置功能待开发<br>敬请期待</div>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+        (function() {
+            if (window.floatingWindowInjected) return;
+            window.floatingWindowInjected = true;
+
+            // 保留原配置、工具函数、拖拽/面板切换逻辑，不改动
+            const config = { 
+                floatBtnSize: 60, 
+                safeMargin: 20, 
+                defaultSafeBottom: 20, 
+                windowWidth: 300, 
+                windowHeight: 280 
+            };
+            
+            const utils = {
+                getSafeBottom() { 
+                    const p = parseFloat(getComputedStyle(document.body).paddingBottom); 
+                    return isNaN(p) ? config.defaultSafeBottom : p; 
+                },
+                checkWindowBound(left, top) { 
+                    const w = document.documentElement.clientWidth; 
+                    const h = document.documentElement.clientHeight; 
+                    const sb = utils.getSafeBottom(); 
+                    return { 
+                        left: Math.max(config.safeMargin, Math.min(left, w - config.windowWidth - config.safeMargin)), 
+                        top: Math.max(config.safeMargin, Math.min(top, h - config.windowHeight - sb - config.safeMargin)) 
+                    }; 
+                },
+                getDefaultWindowPos() { 
+                    const w = document.documentElement.clientWidth; 
+                    const h = document.documentElement.clientHeight; 
+                    return utils.checkWindowBound((w-config.windowWidth)/2, (h-config.windowHeight)/2); 
+                },
+                // 新增：Base64解码（解析URL中的公告数据，适配GitHub）
+                decodeData(encoded) {
+                    return JSON.parse(decodeURIComponent(atob(encoded)));
+                },
+                // 新增：获取URL参数（接收公告更新模块的推送数据）
+                getUrlParam(key) {
+                    const params = window.location.href.split('?')[1];
+                    if (!params) return null;
+                    const paramArr = params.split('&');
+                    for (let p of paramArr) {
+                        const [k, v] = p.split('=');
+                        if (k === key) return v;
+                    }
+                    return null;
+                }
+            };
+
+            // 保留原元素引用，新增公告相关元素
+            const floatBtn = document.getElementById('floatBtn');
+            const floatWindow = document.getElementById('floatWindow');
+            const modalBack = document.getElementById('modalBack');
+            const funcButtons = document.getElementById('funcButtons');
+            const btnMy = document.getElementById('btnMy');
+            const btnNotice = document.getElementById('btnNotice');
+            const btnContact = document.getElementById('btnContact');
+            const btnSetting = document.getElementById('btnSetting');
+            const panelMy = document.getElementById('panelMy');
+            const panelNotice = document.getElementById('panelNotice');
+            const panelContact = document.getElementById('panelContact');
+            const panelSetting = document.getElementById('panelSetting');
+            // 新增：公告相关元素
+            const defaultTip = document.getElementById('defaultTip');
+            const pushNotice = document.getElementById('pushNotice');
+
+            // 保留原状态变量，新增公告状态（sessionStorage：适配GitHub，临时存储）
+            let btnIsDragging = false, winIsDragging = false, isInMainPanel = true;
+            let currentWindowPos = utils.getDefaultWindowPos();
+            const NOTICE_STATUS_KEY = 'isNoticeUpdated'; // 标记是否已更新
+
+            // 1. 保留原面板切换逻辑，仅在切换公告面板时新增“渲染公告”
+            function switchContentPanel(targetId) {
+                funcButtons.style.display = 'none';
+                [panelMy, panelNotice, panelContact, panelSetting].forEach(panel => {
+                    panel.classList.remove('active');
+                    panel.style.display = 'none';
+                });
+                const targetPanel = document.getElementById(targetId);
+                targetPanel.classList.add('active');
+                targetPanel.style.display = 'block';
+                modalBack.style.display = 'block';
+                isInMainPanel = false;
+
+                // 新增：切换到公告面板，自动渲染公告
+                if (targetId === 'panelNotice') {
+                    renderNotice();
+                }
+            }
+
+            function backToMainPanel() {
+                [panelMy, panelNotice, panelContact, panelSetting].forEach(panel => {
+                    panel.classList.remove('active');
+                    panel.style.display = 'none';
+                });
+                funcButtons.style.display = 'flex';
+                modalBack.style.display = 'none';
+                isInMainPanel = true;
+            }
+
+            // 2. 新增核心功能：渲染公告（下载不消失，更新才消失）
+            function renderNotice() {
+                // 解析URL中的公告数据（来自公告更新模块的推送）
+                const encodedNotice = utils.getUrlParam('notice');
+                if (!encodedNotice) {
+                    // 无数据：显示原空提示，隐藏公告
+                    defaultTip.style.display = 'block';
+                    pushNotice.style.display = 'none';
+                    return;
+                }
+
+                // 解码数据（容错处理）
+                let noticeData;
+                try {
+                    noticeData = utils.decodeData(encodedNotice);
+                } catch (e) {
+                    defaultTip.textContent = '公告数据解析失败，请检查推送URL';
+                    defaultTip.style.display = 'block';
+                    pushNotice.style.display = 'none';
+                    return;
+                }
+
+                // 校验数据（匹配原公告更新模块的字段）
+                if (!noticeData.title || !noticeData.date || !noticeData.content || !noticeData.downloadUrl || !noticeData.updateUrl) {
+                    defaultTip.textContent = '公告数据不完整，请重新推送';
+                    defaultTip.style.display = 'block';
+                    pushNotice.style.display = 'none';
+                    return;
+                }
+
+                // 关键判断：已更新（隐藏）/ 未更新（显示）
+                const isUpdated = sessionStorage.getItem(NOTICE_STATUS_KEY) === 'true';
+                pushNotice.className = isUpdated ? 'notice-item hidden' : 'notice-item';
+                defaultTip.style.display = 'none';
+
+                // 渲染公告内容（保留原公告字段，新增下载/更新按钮）
+                pushNotice.innerHTML = `
+                    <div class="notice-title">${noticeData.title}</div>
+                    <div class="notice-time">更新时间：${noticeData.date}</div>
+                    <div class="notice-content">${noticeData.content}</div>
+                    <div class="notice-actions">
+                        <button class="action-btn download-btn" onclick="window.open('${noticeData.downloadUrl}', '_blank')">下载</button>
+                        <button class="action-btn update-btn" onclick="handleUpdate('${noticeData.updateUrl}')">更新</button>
+                    </div>
+                `;
+            }
+
+            // 3. 新增核心功能：处理更新（点击后隐藏公告，跳转链接）
+            function handleUpdate(updateUrl) {
+                // 标记为“已更新”（临时存储，关闭页面重置）
+                sessionStorage.setItem(NOTICE_STATUS_KEY, 'true');
+                // 隐藏公告（重新渲染）
+                renderNotice();
+                // 跳转更新链接
+                window.open(updateUrl, '_blank');
+                // 保留原提示风格，不新增弹窗样式
+                alert('更新完成，公告已隐藏');
+            }
+
+            // 4. 保留原悬浮窗显示/隐藏逻辑
+            floatBtn.addEventListener('click', () => {
+                if (btnIsDragging) return;
+                floatWindow.classList.toggle('active');
+                if (floatWindow.classList.contains('active')) {
+                    currentWindowPos = utils.checkWindowBound(currentWindowPos.left, currentWindowPos.top);
+                    floatWindow.style.left = `${currentWindowPos.left}px`;
+                    floatWindow.style.top = `${currentWindowPos.top}px`;
+                }
+            });
+
+            // 5. 保留原拖拽功能逻辑，不改动
+            let btnDragStart, winDragStart;
+            
+            floatBtn.addEventListener('touchstart', (e) => {
+                const touch = e.touches[0];
+                btnDragStart = {
+                    x: touch.clientX,
+                    y: touch.clientY,
+                    rect: floatBtn.getBoundingClientRect()
+                };
+                btnIsDragging = false;
+            }, { passive: true });
+
+            floatBtn.addEventListener('touchmove', (e) => {
+                const touch = e.touches[0];
+                const dx = touch.clientX - btnDragStart.x;
+                const dy = touch.clientY - btnDragStart.y;
+                if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                    btnIsDragging = true;
+                    const left = btnDragStart.rect.left + dx;
+                    const top = btnDragStart.rect.top + dy;
+                    const winWidth = document.documentElement.clientWidth;
+                    const winHeight = document.documentElement.clientHeight;
+                    const safeBottom = utils.getSafeBottom();
+                    
+                    const boundedLeft = Math.max(config.safeMargin, Math.min(left, winWidth - config.floatBtnSize - config.safeMargin));
+                    const boundedTop = Math.max(config.safeMargin, Math.min(top, winHeight - config.floatBtnSize - safeBottom - config.safeMargin));
+                    
+                    floatBtn.style.left = `${boundedLeft}px`;
+                    floatBtn.style.top = `${boundedTop}px`;
+                    floatBtn.style.right = 'auto';
+                    floatBtn.style.bottom = 'auto';
+                }
+            }, { passive: false });
+
+            windowHeader.addEventListener('touchstart', (e) => {
+                if (!floatWindow.classList.contains('active')) return;
+                const touch = e.touches[0];
+                winDragStart = {
+                    x: touch.clientX,
+                    y: touch.clientY,
+                    rect: floatWindow.getBoundingClientRect()
+                };
+                winIsDragging = false;
+            }, { passive: true });
+
+            windowHeader.addEventListener('touchmove', (e) => {
+                if (!floatWindow.classList.contains('active')) return;
+                const touch = e.touches[0];
+                const dx = touch.clientX - winDragStart.x;
+                const dy = touch.clientY - winDragStart.y;
+                if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                    winIsDragging = true;
+                    currentWindowPos = {
+                        left: winDragStart.rect.left + dx,
+                        top: winDragStart.rect.top + dy
+                    };
+                    currentWindowPos = utils.checkWindowBound(currentWindowPos.left, currentWindowPos.top);
+                    floatWindow.style.left = `${currentWindowPos.left}px`;
+                    floatWindow.style.top = `${currentWindowPos.top}px`;
+                }
+            }, { passive: false });
+
+            // 6. 保留原按钮事件绑定，不改动
+            modalBack.addEventListener('click', (e) => { e.stopPropagation(); backToMainPanel(); });
+            btnMy.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelMy'); });
+            btnNotice.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelNotice'); });
+            btnContact.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelContact'); });
+            btnSetting.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelSetting'); });
+
+            // 7. 保留原窗口适配逻辑，新增“页面加载时渲染公告”
+            window.addEventListener('load', () => {
+                const winWidth = document.documentElement.clientWidth;
+                const winHeight = document.documentElement.clientHeight;
+                const safeBottom = utils.getSafeBottom();
+                
+                floatBtn.style.left = `${winWidth - config.floatBtnSize - config.safeMargin}px`;
+                floatBtn.style.top = `${winHeight - config.floatBtnSize - safeBottom - config.safeMargin}px`;
+
+                // 新增：页面加载时，自动解析URL渲染公告（若有推送）
+                renderNotice();
+            });
+
+            window.addEventListener('resize', () => {
+                const winWidth = document.documentElement.clientWidth;
+                const winHeight = document.documentElement.clientHeight;
+                const safeBottom = utils.getSafeBottom();
+                
+                floatBtn.style.left = `${winWidth - config.floatBtnSize - config.safeMargin}px`;
+                floatBtn.style.top = `${winHeight - config.floatBtnSize - safeBottom - config.safeMargin}px`;
+                
+                if (floatWindow.classList.contains('active')) {
+                    currentWindowPos = utils.checkWindowBound(currentWindowPos.left, currentWindowPos.top);
+                    floatWindow.style.left = `${currentWindowPos.left}px`;
+                    floatWindow.style.top = `${currentWindowPos.top}px`;
+                }
+            });
+
+            // 暴露更新函数（公告按钮调用，不影响原逻辑）
+            window.handleUpdate = handleUpdate;
+        })();
+    </script>
 </body>
 </html>
