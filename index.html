@@ -3,18 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自动部署测试页（拆分版）</title>
-    <!-- 引入外部CSS文件，关联样式 -->
+    <title>公告更新功能</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="test-box">
-        <h1>自动部署测试页面</h1>
-        <button id="btn-test">点击测试交互</button>
-        <div id="show-text"></div>
+    <button class="edit-switch" id="editSwitch">打开公告更新模版</button>
+    <div class="edit-panel" id="editPanel">
+        <h2 class="edit-title">公告更新模版</h2>
+        <div class="form-group">
+            <label class="form-label">1. 公告标题</label>
+            <input type="text" class="form-input" id="editTitle" placeholder="填写公告标题">
+        </div>
+        <div class="form-group">
+            <label class="form-label">2. 更新日期</label>
+            <input type="date" class="form-input" id="editDate">
+        </div>
+        <div class="form-group">
+            <label class="form-label">3. 更新内容</label>
+            <textarea class="form-textarea" id="editContent" placeholder="描述更新内容"></textarea>
+        </div>
+        <div class="form-group">
+            <label class="form-label">4. 配置更新链接（可选）</label>
+            <input type="text" class="form-input" id="editUpdateUrl" placeholder="填写更新链接">
+        </div>
+        <div class="form-group">
+            <label class="form-label">5. 上传更新文件（可选）</label>
+            <div class="file-upload">
+                <input type="file" id="editFile" accept=".html,.zip,.apk,.doc,.pdf,.exe,.txt">
+                <div class="file-info" id="editFileInfo">点击或拖拽文件到此处</div>
+            </div>
+        </div>
+        <div class="edit-btns">
+            <button class="edit-btn close-btn" id="closeEdit">关闭模版</button>
+            <button class="edit-btn sync-btn" id="syncNotice">同步公告</button>
+        </div>
     </div>
 
-    <!-- 引入外部JS文件，关联交互（放body末尾，确保页面结构加载完再执行JS） -->
     <script src="script.js"></script>
 </body>
 </html>
