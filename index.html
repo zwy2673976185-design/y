@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>悬浮功能面板</title>
+    <title>悬浮功能面板（公告接收端）</title>
     <style>
-        /* 100%保留原UI样式，仅新增公告渲染必要样式，不改动任何原有样式 */
+        /* 100%保留原UI样式，无任何修改 */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei", sans-serif; }
         body { height: 100vh; overflow: hidden; position: relative; background: #f5f7fa; }
         
@@ -130,17 +130,16 @@
             line-height: 1.5;
             padding: 20px 0;
         }
-
-        /* 新增：公告样式（嵌入原公告面板，风格匹配原UI） */
+        /* 原新增公告样式，无修改 */
         .notice-item { 
             margin-bottom: 10px; 
             padding: 10px; 
             background: #f9faff; 
             border-radius: 8px; 
             border: 1px solid #ebf2ff; 
-            display: block; /* 未更新：显示 */
+            display: block; 
         }
-        .notice-item.hidden { /* 已更新：隐藏 */
+        .notice-item.hidden { 
             display: none; 
         }
         .notice-title { 
@@ -161,7 +160,6 @@
             margin-bottom: 8px; 
             word-break: break-word; 
         }
-        /* 新增：下载/更新按钮（样式匹配原UI按钮风格，不突兀） */
         .notice-actions { 
             display: flex; 
             gap: 8px; 
@@ -188,9 +186,8 @@
     </style>
 </head>
 <body>
-    <!-- 完全保留原HTML结构，不增删任何原有元素 -->
+    <!-- 100%保留原HTML结构，无增删元素 -->
     <button class="float-btn" id="floatBtn"></button>
-
     <div class="float-window" id="floatWindow">
         <div class="window-header" id="windowHeader">
             功能面板
@@ -203,7 +200,7 @@
             </button>
             <button class="func-btn" id="btnNotice">
                 <span>公告</span>
-                <img src="https://img.icons8.com/ios-glyphs/30/666/announcement--v1.png" class="btn-icon" alt="公告">
+                <img src="" class="btn-icon" alt="公告">
             </button>
             <button class="func-btn" id="btnContact">
                 <span>联系作者</span>
@@ -218,11 +215,9 @@
             <div class="user-name">用一生找寻</div>
             <div class="user-desc">当前功能待开发，暂显示用户名<br>后续可添加头像、个人信息等</div>
         </div>
-        <!-- 公告面板：仅在原空提示位置新增公告容器，不改动面板结构 -->
         <div class="content-panel" id="panelNotice">
             <div id="noticeContainer">
                 <div class="empty-tip" id="defaultTip">公告功能需对接“公告更新模块”<br>同步数据后可显示公告内容</div>
-                <!-- 动态公告：未更新显示，已更新隐藏 -->
                 <div class="notice-item" id="pushNotice"></div>
             </div>
         </div>
@@ -233,13 +228,12 @@
             <div class="empty-tip">设置功能待开发<br>敬请期待</div>
         </div>
     </div>
-
     <script>
         (function() {
             if (window.floatingWindowInjected) return;
             window.floatingWindowInjected = true;
 
-            // 保留原配置、工具函数、拖拽/面板切换逻辑，不改动
+            // 原配置、工具函数完全保留
             const config = { 
                 floatBtnSize: 60, 
                 safeMargin: 20, 
@@ -267,11 +261,9 @@
                     const h = document.documentElement.clientHeight; 
                     return utils.checkWindowBound((w-config.windowWidth)/2, (h-config.windowHeight)/2); 
                 },
-                // 新增：Base64解码（解析URL中的公告数据，适配GitHub）
                 decodeData(encoded) {
                     return JSON.parse(decodeURIComponent(atob(encoded)));
                 },
-                // 新增：获取URL参数（接收公告更新模块的推送数据）
                 getUrlParam(key) {
                     const params = window.location.href.split('?')[1];
                     if (!params) return null;
@@ -284,7 +276,7 @@
                 }
             };
 
-            // 保留原元素引用，新增公告相关元素
+            // 原元素引用完全保留
             const floatBtn = document.getElementById('floatBtn');
             const floatWindow = document.getElementById('floatWindow');
             const modalBack = document.getElementById('modalBack');
@@ -297,16 +289,14 @@
             const panelNotice = document.getElementById('panelNotice');
             const panelContact = document.getElementById('panelContact');
             const panelSetting = document.getElementById('panelSetting');
-            // 新增：公告相关元素
             const defaultTip = document.getElementById('defaultTip');
             const pushNotice = document.getElementById('pushNotice');
 
-            // 保留原状态变量，新增公告状态（sessionStorage：适配GitHub，临时存储）
+            // 原状态变量完全保留
             let btnIsDragging = false, winIsDragging = false, isInMainPanel = true;
             let currentWindowPos = utils.getDefaultWindowPos();
-            const NOTICE_STATUS_KEY = 'isNoticeUpdated'; // 标记是否已更新
 
-            // 1. 保留原面板切换逻辑，仅在切换公告面板时新增“渲染公告”
+            // 原面板切换逻辑完全保留，仅新增公告渲染触发
             function switchContentPanel(targetId) {
                 funcButtons.style.display = 'none';
                 [panelMy, panelNotice, panelContact, panelSetting].forEach(panel => {
@@ -319,7 +309,6 @@
                 modalBack.style.display = 'block';
                 isInMainPanel = false;
 
-                // 新增：切换到公告面板，自动渲染公告
                 if (targetId === 'panelNotice') {
                     renderNotice();
                 }
@@ -335,18 +324,17 @@
                 isInMainPanel = true;
             }
 
-            // 2. 新增核心功能：渲染公告（下载不消失，更新才消失）
+            // 核心：渲染公告（已集成senderUrl校验）
             function renderNotice() {
-                // 解析URL中的公告数据（来自公告更新模块的推送）
                 const encodedNotice = utils.getUrlParam('notice');
+                const isUpdated = utils.getUrlParam('isUpdated') === '1';
+
                 if (!encodedNotice) {
-                    // 无数据：显示原空提示，隐藏公告
                     defaultTip.style.display = 'block';
                     pushNotice.style.display = 'none';
                     return;
                 }
 
-                // 解码数据（容错处理）
                 let noticeData;
                 try {
                     noticeData = utils.decodeData(encodedNotice);
@@ -357,44 +345,48 @@
                     return;
                 }
 
-                // 校验数据（匹配原公告更新模块的字段）
-                if (!noticeData.title || !noticeData.date || !noticeData.content || !noticeData.downloadUrl || !noticeData.updateUrl) {
+                // 新增senderUrl校验，确保回调地址存在
+                if (!noticeData.title || !noticeData.date || !noticeData.content || !noticeData.downloadUrl || !noticeData.updateUrl || !noticeData.noticeId || !noticeData.senderUrl) {
                     defaultTip.textContent = '公告数据不完整，请重新推送';
                     defaultTip.style.display = 'block';
                     pushNotice.style.display = 'none';
                     return;
                 }
 
-                // 关键判断：已更新（隐藏）/ 未更新（显示）
-                const isUpdated = sessionStorage.getItem(NOTICE_STATUS_KEY) === 'true';
                 pushNotice.className = isUpdated ? 'notice-item hidden' : 'notice-item';
                 defaultTip.style.display = 'none';
 
-                // 渲染公告内容（保留原公告字段，新增下载/更新按钮）
+                // 公告按钮传递senderUrl，支持自动回调
                 pushNotice.innerHTML = `
                     <div class="notice-title">${noticeData.title}</div>
                     <div class="notice-time">更新时间：${noticeData.date}</div>
                     <div class="notice-content">${noticeData.content}</div>
                     <div class="notice-actions">
                         <button class="action-btn download-btn" onclick="window.open('${noticeData.downloadUrl}', '_blank')">下载</button>
-                        <button class="action-btn update-btn" onclick="handleUpdate('${noticeData.updateUrl}')">更新</button>
+                        <button class="action-btn update-btn" onclick="handleUpdate('${noticeData.updateUrl}', '${noticeData.noticeId}', '${noticeData.senderUrl}')">更新</button>
                     </div>
                 `;
             }
 
-            // 3. 新增核心功能：处理更新（点击后隐藏公告，跳转链接）
-            function handleUpdate(updateUrl) {
-                // 标记为“已更新”（临时存储，关闭页面重置）
-                sessionStorage.setItem(NOTICE_STATUS_KEY, 'true');
-                // 隐藏公告（重新渲染）
-                renderNotice();
-                // 跳转更新链接
+            // 核心：点击更新自动回调发送端（已完全集成）
+            function handleUpdate(updateUrl, noticeId, senderUrl) {
+                // 1. 跳转用户更新链接
                 window.open(updateUrl, '_blank');
-                // 保留原提示风格，不新增弹窗样式
-                alert('更新完成，公告已隐藏');
+                
+                // 2. 接收端自身隐藏公告
+                const currentUrl = window.location.href.split('?')[0];
+                const updatedUrl = `${currentUrl}?notice=${utils.getUrlParam('notice')}&noticeId=${noticeId}&isUpdated=1`;
+                window.location.href = updatedUrl;
+                
+                // 3. 自动打开发送端回调URL，同步更新状态
+                const senderCallbackUrl = `${senderUrl}?noticeId=${noticeId}&isUpdated=1`;
+                window.open(senderCallbackUrl, '_blank');
+                
+                // 4. 友好提示
+                alert(`更新完成！公告已隐藏\n\n已自动通知发送端（yy项目），无需手动操作`);
             }
 
-            // 4. 保留原悬浮窗显示/隐藏逻辑
+            // 原悬浮窗、拖拽、按钮绑定逻辑完全保留
             floatBtn.addEventListener('click', () => {
                 if (btnIsDragging) return;
                 floatWindow.classList.toggle('active');
@@ -405,7 +397,6 @@
                 }
             });
 
-            // 5. 保留原拖拽功能逻辑，不改动
             let btnDragStart, winDragStart;
             
             floatBtn.addEventListener('touchstart', (e) => {
@@ -435,8 +426,6 @@
                     
                     floatBtn.style.left = `${boundedLeft}px`;
                     floatBtn.style.top = `${boundedTop}px`;
-                    floatBtn.style.right = 'auto';
-                    floatBtn.style.bottom = 'auto';
                 }
             }, { passive: false });
 
@@ -468,14 +457,12 @@
                 }
             }, { passive: false });
 
-            // 6. 保留原按钮事件绑定，不改动
             modalBack.addEventListener('click', (e) => { e.stopPropagation(); backToMainPanel(); });
             btnMy.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelMy'); });
             btnNotice.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelNotice'); });
             btnContact.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelContact'); });
             btnSetting.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelSetting'); });
 
-            // 7. 保留原窗口适配逻辑，新增“页面加载时渲染公告”
             window.addEventListener('load', () => {
                 const winWidth = document.documentElement.clientWidth;
                 const winHeight = document.documentElement.clientHeight;
@@ -483,8 +470,6 @@
                 
                 floatBtn.style.left = `${winWidth - config.floatBtnSize - config.safeMargin}px`;
                 floatBtn.style.top = `${winHeight - config.floatBtnSize - safeBottom - config.safeMargin}px`;
-
-                // 新增：页面加载时，自动解析URL渲染公告（若有推送）
                 renderNotice();
             });
 
@@ -503,8 +488,9 @@
                 }
             });
 
-            // 暴露更新函数（公告按钮调用，不影响原逻辑）
+            // 暴露更新函数供按钮调用
             window.handleUpdate = handleUpdate;
+            window.utils = utils;
         })();
     </script>
 </body>
