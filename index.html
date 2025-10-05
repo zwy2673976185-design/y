@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>悬浮功能面板（公告接收端）</title>
     <style>
-        /* 100%保留原UI样式，无任何修改 */
+        /* 原有所有样式保持不变 */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei", sans-serif; }
         body { height: 100vh; overflow: hidden; position: relative; background: #f5f7fa; }
         
@@ -130,7 +130,7 @@
             line-height: 1.5;
             padding: 20px 0;
         }
-        /* 原新增公告样式，无修改 */
+        
         .notice-item { 
             margin-bottom: 10px; 
             padding: 10px; 
@@ -186,7 +186,6 @@
     </style>
 </head>
 <body>
-    <!-- 100%保留原HTML结构，无增删元素 -->
     <button class="float-btn" id="floatBtn"></button>
     <div class="float-window" id="floatWindow">
         <div class="window-header" id="windowHeader">
@@ -200,7 +199,7 @@
             </button>
             <button class="func-btn" id="btnNotice">
                 <span>公告</span>
-                <img src="" class="btn-icon" alt="公告">
+                <img src="https://img.icons8.com/ios-glyphs/30/666/announcement--v1.png" class="btn-icon" alt="公告">
             </button>
             <button class="func-btn" id="btnContact">
                 <span>联系作者</span>
@@ -217,7 +216,7 @@
         </div>
         <div class="content-panel" id="panelNotice">
             <div id="noticeContainer">
-                <div class="empty-tip" id="defaultTip">公告功能需对接“公告更新模块”<br>同步数据后可显示公告内容</div>
+                <div class="empty-tip" id="defaultTip">公告功能需对接"公告更新模块"<br>同步数据后可显示公告内容</div>
                 <div class="notice-item" id="pushNotice"></div>
             </div>
         </div>
@@ -233,7 +232,6 @@
             if (window.floatingWindowInjected) return;
             window.floatingWindowInjected = true;
 
-            // 原配置、工具函数完全保留
             const config = { 
                 floatBtnSize: 60, 
                 safeMargin: 20, 
@@ -265,18 +263,11 @@
                     return JSON.parse(decodeURIComponent(atob(encoded)));
                 },
                 getUrlParam(key) {
-                    const params = window.location.href.split('?')[1];
-                    if (!params) return null;
-                    const paramArr = params.split('&');
-                    for (let p of paramArr) {
-                        const [k, v] = p.split('=');
-                        if (k === key) return v;
-                    }
-                    return null;
+                    const urlParams = new URLSearchParams(window.location.search);
+                    return urlParams.get(key);
                 }
             };
 
-            // 原元素引用完全保留
             const floatBtn = document.getElementById('floatBtn');
             const floatWindow = document.getElementById('floatWindow');
             const modalBack = document.getElementById('modalBack');
@@ -292,11 +283,9 @@
             const defaultTip = document.getElementById('defaultTip');
             const pushNotice = document.getElementById('pushNotice');
 
-            // 原状态变量完全保留
             let btnIsDragging = false, winIsDragging = false, isInMainPanel = true;
             let currentWindowPos = utils.getDefaultWindowPos();
 
-            // 原面板切换逻辑完全保留，仅新增公告渲染触发
             function switchContentPanel(targetId) {
                 funcButtons.style.display = 'none';
                 [panelMy, panelNotice, panelContact, panelSetting].forEach(panel => {
@@ -324,7 +313,7 @@
                 isInMainPanel = true;
             }
 
-            // 核心：渲染公告（已集成senderUrl校验）
+            // 渲染公告
             function renderNotice() {
                 const encodedNotice = utils.getUrlParam('notice');
                 const isUpdated = utils.getUrlParam('isUpdated') === '1';
@@ -345,7 +334,7 @@
                     return;
                 }
 
-                // 新增senderUrl校验，确保回调地址存在
+                // 数据完整性校验
                 if (!noticeData.title || !noticeData.date || !noticeData.content || !noticeData.downloadUrl || !noticeData.updateUrl || !noticeData.noticeId || !noticeData.senderUrl) {
                     defaultTip.textContent = '公告数据不完整，请重新推送';
                     defaultTip.style.display = 'block';
@@ -356,7 +345,6 @@
                 pushNotice.className = isUpdated ? 'notice-item hidden' : 'notice-item';
                 defaultTip.style.display = 'none';
 
-                // 公告按钮传递senderUrl，支持自动回调
                 pushNotice.innerHTML = `
                     <div class="notice-title">${noticeData.title}</div>
                     <div class="notice-time">更新时间：${noticeData.date}</div>
@@ -368,7 +356,7 @@
                 `;
             }
 
-            // 核心：点击更新自动回调发送端（已完全集成）
+            // 点击更新自动回调发送端
             function handleUpdate(updateUrl, noticeId, senderUrl) {
                 // 1. 跳转用户更新链接
                 window.open(updateUrl, '_blank');
@@ -378,15 +366,15 @@
                 const updatedUrl = `${currentUrl}?notice=${utils.getUrlParam('notice')}&noticeId=${noticeId}&isUpdated=1`;
                 window.location.href = updatedUrl;
                 
-                // 3. 自动打开发送端回调URL，同步更新状态
+                // 3. 自动打开发送端回调URL
                 const senderCallbackUrl = `${senderUrl}?noticeId=${noticeId}&isUpdated=1`;
                 window.open(senderCallbackUrl, '_blank');
                 
                 // 4. 友好提示
-                alert(`更新完成！公告已隐藏\n\n已自动通知发送端（yy项目），无需手动操作`);
+                alert('更新完成！公告已隐藏\n\n已自动通知发送端，无需手动操作');
             }
 
-            // 原悬浮窗、拖拽、按钮绑定逻辑完全保留
+            // 原有悬浮窗、拖拽、按钮绑定逻辑
             floatBtn.addEventListener('click', () => {
                 if (btnIsDragging) return;
                 floatWindow.classList.toggle('active');
@@ -490,7 +478,6 @@
 
             // 暴露更新函数供按钮调用
             window.handleUpdate = handleUpdate;
-            window.utils = utils;
         })();
     </script>
 </body>
