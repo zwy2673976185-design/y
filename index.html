@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>悬浮功能面板（公告接收端）</title>
+    <title>悬浮功能面板（Y接收端）</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei", sans-serif; }
         body { height: 100vh; overflow: hidden; position: relative; background: #f5f7fa; }
@@ -159,6 +159,30 @@
             margin-bottom: 8px; 
             word-break: break-word; 
         }
+        /* 下载进度条样式 */
+        .download-progress {
+            width: 100%;
+            height: 6px;
+            background: #ebf2ff;
+            border-radius: 3px;
+            margin-bottom: 8px;
+            overflow: hidden;
+            display: none; /* 默认隐藏 */
+        }
+        .progress-bar {
+            height: 100%;
+            background: #2563eb;
+            border-radius: 3px;
+            width: 0%; /* 初始进度0% */
+            transition: width 0.1s linear; /* 实时更新过渡 */
+        }
+        .progress-text {
+            font-size: 12px;
+            color: #666;
+            text-align: right;
+            margin-bottom: 8px;
+            display: none; /* 默认隐藏 */
+        }
         .notice-actions { 
             display: flex; 
             gap: 8px; 
@@ -181,8 +205,8 @@
             background: #10b981; 
             color: white; 
             box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2); 
+            display: none; /* 默认隐藏，进度100%显示 */
         }
-
         .status-badge {
             display: inline-block;
             padding: 2px 8px;
@@ -205,7 +229,7 @@
     <button class="float-btn" id="floatBtn"></button>
     <div class="float-window" id="floatWindow">
         <div class="window-header" id="windowHeader">
-            功能面板
+            功能面板（Y接收端）
             <button class="modal-back" id="modalBack">返回</button>
         </div>
         <div class="func-buttons" id="funcButtons">
@@ -232,8 +256,8 @@
         </div>
         <div class="content-panel" id="panelNotice">
             <div id="noticeContainer">
-                <div class="empty-tip" id="defaultTip">暂无最新公告<br>等待发送端发布更新</div>
-                <div class="notice-item" id="pushNotice"></div>
+                <div class="empty-tip" id="defaultTip">暂无最新公告<br>等待YY发送端发布更新</div>
+                <div class="notice-item" id="pushNotice"></div> <!-- 公告容器（仅1个，避免重复） -->
             </div>
         </div>
         <div class="content-panel" id="panelContact">
@@ -243,12 +267,10 @@
             <div class="empty-tip">设置功能待开发<br>敬请期待</div>
         </div>
     </div>
-
     <script>
         (function() {
             if (window.floatingWindowInjected) return;
             window.floatingWindowInjected = true;
-
             const config = { 
                 floatBtnSize: 60, 
                 safeMargin: 20, 
@@ -277,7 +299,7 @@
                     return utils.checkWindowBound((w-config.windowWidth)/2, (h-config.windowHeight)/2); 
                 }
             };
-
+            // 基础元素引用
             const floatBtn = document.getElementById('floatBtn');
             const floatWindow = document.getElementById('floatWindow');
             const modalBack = document.getElementById('modalBack');
@@ -292,11 +314,13 @@
             const panelSetting = document.getElementById('panelSetting');
             const defaultTip = document.getElementById('defaultTip');
             const pushNotice = document.getElementById('pushNotice');
-
+            
             let btnIsDragging = false, winIsDragging = false, isInMainPanel = true;
             let currentWindowPos = utils.getDefaultWindowPos();
             let isUpdated = localStorage.getItem('noticeUpdated') === 'true';
+            let downloadXHR = null; // 下载请求实例，防止重复下载
 
+            // 面板切换逻辑
             function switchContentPanel(targetId) {
                 funcButtons.style.display = 'none';
                 [panelMy, panelNotice, panelContact, panelSetting].forEach(panel => {
@@ -308,12 +332,10 @@
                 targetPanel.style.display = 'block';
                 modalBack.style.display = 'block';
                 isInMainPanel = false;
-
                 if (targetId === 'panelNotice') {
-                    renderNotice();
+                    renderNotice(); // 切换到公告面板时渲染
                 }
             }
-
             function backToMainPanel() {
                 [panelMy, panelNotice, panelContact, panelSetting].forEach(panel => {
                     panel.classList.remove('active');
@@ -324,27 +346,24 @@
                 isInMainPanel = true;
             }
 
-            // 渲染公告 - 直接从localStorage读取
+            // 核心：渲染公告（修复重复推送+ID重复，精准绑定事件）
             function renderNotice() {
-                // 检查是否已经更新
+                // 已更新状态：显示提示，隐藏公告
                 if (isUpdated) {
                     defaultTip.textContent = '已更新到最新版本';
                     defaultTip.style.display = 'block';
                     pushNotice.style.display = 'none';
                     return;
                 }
-
+                // 读取公告数据
                 const noticeData = JSON.parse(localStorage.getItem('currentNotice'));
-                
                 if (!noticeData) {
                     defaultTip.style.display = 'block';
                     pushNotice.style.display = 'none';
+                    resetProgressState(); // 无公告时重置进度
                     return;
                 }
-
-                defaultTip.style.display = 'none';
-                pushNotice.style.display = 'block';
-
+                // 有公告：覆盖渲染（用innerHTML，不追加，避免重复）
                 pushNotice.innerHTML = `
                     <div class="notice-title">
                         ${noticeData.title}
@@ -352,36 +371,165 @@
                     </div>
                     <div class="notice-time">更新时间：${noticeData.date}</div>
                     <div class="notice-content">${noticeData.content}</div>
+                    <!-- 进度条（仅生成1次，无ID重复） -->
+                    <div class="download-progress">
+                        <div class="progress-bar"></div>
+                    </div>
+                    <div class="progress-text">进度：0%</div>
+                    <!-- 按钮（仅生成1次） -->
                     <div class="notice-actions">
-                        <button class="action-btn download-btn" onclick="handleDownload('${noticeData.downloadUrl}')">下载</button>
-                        <button class="action-btn update-btn" onclick="handleUpdate('${noticeData.updateUrl}', '${noticeData.noticeId}')">更新</button>
+                        <button class="action-btn download-btn">下载</button>
+                        <button class="action-btn update-btn">更新</button>
                     </div>
                 `;
+                // 渲染后立即获取当前公告的元素（精准定位，不全局冲突）
+                const downloadBtn = pushNotice.querySelector('.download-btn');
+                const updateBtn = pushNotice.querySelector('.update-btn');
+                const downloadProgress = pushNotice.querySelector('.download-progress');
+                const progressBar = pushNotice.querySelector('.progress-bar');
+                const progressText = pushNotice.querySelector('.progress-text');
+
+                // 初始化按钮/进度条状态
+                updateBtn.style.display = 'none';
+                downloadProgress.style.display = 'none';
+                progressText.style.display = 'none';
+
+                // 绑定下载事件（直接绑定到当前按钮，避免失效）
+                downloadBtn.addEventListener('click', () => {
+                    if (!noticeData.resourceUrl) {
+                        alert('资源链接无效，请联系YY发送端确认！');
+                        return;
+                    }
+                    handleDownload(
+                        noticeData.resourceUrl, 
+                        downloadBtn, updateBtn, 
+                        downloadProgress, progressBar, progressText
+                    );
+                });
+
+                // 绑定更新事件
+                updateBtn.addEventListener('click', () => {
+                    handleUpdate(noticeData.resourceUrl, noticeData.noticeId);
+                });
+
+                // 显示公告，隐藏默认提示
+                defaultTip.style.display = 'none';
+                pushNotice.style.display = 'block';
             }
 
-            // 下载处理
-            function handleDownload(downloadUrl) {
-                window.open(downloadUrl, '_blank');
-                // 下载后公告不消失
+            // 核心：下载处理（接收当前公告元素，确保进度条/按钮正常工作）
+            function handleDownload(resourceUrl, downloadBtn, updateBtn, downloadProgress, progressBar, progressText) {
+                // 防止重复下载
+                if (downloadXHR) {
+                    alert('正在下载中，请等待进度完成！');
+                    return;
+                }
+                // 切换状态：显示进度条，禁用下载按钮
+                downloadProgress.style.display = 'block';
+                progressText.style.display = 'block';
+                updateBtn.style.display = 'none';
+                downloadBtn.disabled = true;
+                downloadBtn.textContent = '正在下载';
+
+                // 链接格式校验（避免无效链接）
+                if (!resourceUrl.startsWith('http://') && !resourceUrl.startsWith('https://') && !resourceUrl.startsWith('blob:')) {
+                    alert('资源链接格式错误，请让YY发送端重新发布！');
+                    resetProgressState(downloadBtn, updateBtn, downloadProgress, progressBar, progressText);
+                    return;
+                }
+
+                // 发起下载请求（监听进度）
+                downloadXHR = new XMLHttpRequest();
+                downloadXHR.open('GET', resourceUrl, true);
+                downloadXHR.responseType = 'blob'; // 适配文件下载
+
+                // 实时更新进度条
+                downloadXHR.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const progress = Math.round((e.loaded / e.total) * 100);
+                        progressBar.style.width = `${progress}%`;
+                        progressText.textContent = `进度：${progress}%`;
+                    } else {
+                        // 无法计算进度时，提示“正在下载”
+                        progressText.textContent = `进度：正在下载...`;
+                    }
+                });
+
+                // 下载完成
+                downloadXHR.addEventListener('load', () => {
+                    // 200=在线链接正常，0=blob临时链接正常
+                    if (downloadXHR.status === 200 || downloadXHR.status === 0) {
+                        progressBar.style.width = '100%';
+                        progressText.textContent = '进度：100%（下载完成）';
+                        // 延迟切换按钮，让用户看到完成状态
+                        setTimeout(() => {
+                            downloadProgress.style.display = 'none';
+                            progressText.style.display = 'none';
+                            downloadBtn.style.display = 'none';
+                            updateBtn.style.display = 'block';
+                        }, 800);
+                    } else {
+                        alert('下载失败！链接可能已失效，请让YY发送端重新发布');
+                        resetProgressState(downloadBtn, updateBtn, downloadProgress, progressBar, progressText);
+                    }
+                    downloadXHR = null;
+                    downloadBtn.disabled = false;
+                });
+
+                // 下载错误
+                downloadXHR.addEventListener('error', () => {
+                    alert('下载出错！请检查网络，或让YY发送端重新生成链接');
+                    resetProgressState(downloadBtn, updateBtn, downloadProgress, progressBar, progressText);
+                    downloadXHR = null;
+                    downloadBtn.disabled = false;
+                });
+
+                downloadXHR.send();
             }
 
-            // 更新处理
-            function handleUpdate(updateUrl, noticeId) {
-                // 1. 跳转更新链接
-                window.open(updateUrl, '_blank');
-                
-                // 2. 标记为已更新
+            // 核心：更新处理（适配单链接）
+            function handleUpdate(resourceUrl, noticeId) {
+                // 跳转资源链接（单链接复用）
+                window.open(resourceUrl, '_blank');
+                // 标记已更新，重新渲染
                 localStorage.setItem('noticeUpdated', 'true');
                 isUpdated = true;
-                
-                // 3. 重新渲染公告（会显示"已更新"）
                 renderNotice();
-                
-                // 4. 提示用户
                 alert('更新完成！公告已标记为已更新。');
             }
 
-            // 原有悬浮窗、拖拽、按钮绑定逻辑
+            // 辅助：重置进度条/按钮状态（接收当前公告元素）
+            function resetProgressState(downloadBtn, updateBtn, downloadProgress, progressBar, progressText) {
+                if (downloadBtn) {
+                    downloadBtn.textContent = '下载';
+                    downloadBtn.style.display = 'block';
+                }
+                if (progressBar) progressBar.style.width = '0%';
+                if (progressText) {
+                    progressText.textContent = '进度：0%';
+                    progressText.style.display = 'none';
+                }
+                if (downloadProgress) downloadProgress.style.display = 'none';
+                if (updateBtn) updateBtn.style.display = 'none';
+            }
+
+            // 实时监听公告变化（无需刷新，发送端操作后立即同步）
+            window.addEventListener('storage', (e) => {
+                if (e.key === 'currentNotice' || e.key === 'noticeUpdated') {
+                    isUpdated = localStorage.getItem('noticeUpdated') === 'true';
+                    renderNotice();
+                    // 当前在公告面板，提示用户
+                    if (panelNotice.classList.contains('active')) {
+                        if (e.key === 'currentNotice' && e.newValue) {
+                            alert('收到YY发送端新公告！');
+                        } else if (e.key === 'currentNotice' && !e.newValue) {
+                            alert('YY发送端已清除公告！');
+                        }
+                    }
+                }
+            });
+
+            // 原有拖拽、按钮绑定逻辑
             floatBtn.addEventListener('click', () => {
                 if (btnIsDragging) return;
                 floatWindow.classList.toggle('active');
@@ -391,7 +539,6 @@
                     floatWindow.style.top = `${currentWindowPos.top}px`;
                 }
             });
-
             let btnDragStart, winDragStart;
             
             floatBtn.addEventListener('touchstart', (e) => {
@@ -403,7 +550,6 @@
                 };
                 btnIsDragging = false;
             }, { passive: true });
-
             floatBtn.addEventListener('touchmove', (e) => {
                 const touch = e.touches[0];
                 const dx = touch.clientX - btnDragStart.x;
@@ -423,7 +569,6 @@
                     floatBtn.style.top = `${boundedTop}px`;
                 }
             }, { passive: false });
-
             windowHeader.addEventListener('touchstart', (e) => {
                 if (!floatWindow.classList.contains('active')) return;
                 const touch = e.touches[0];
@@ -434,7 +579,6 @@
                 };
                 winIsDragging = false;
             }, { passive: true });
-
             windowHeader.addEventListener('touchmove', (e) => {
                 if (!floatWindow.classList.contains('active')) return;
                 const touch = e.touches[0];
@@ -451,13 +595,11 @@
                     floatWindow.style.top = `${currentWindowPos.top}px`;
                 }
             }, { passive: false });
-
             modalBack.addEventListener('click', (e) => { e.stopPropagation(); backToMainPanel(); });
             btnMy.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelMy'); });
             btnNotice.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelNotice'); });
             btnContact.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelContact'); });
             btnSetting.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelSetting'); });
-
             window.addEventListener('load', () => {
                 const winWidth = document.documentElement.clientWidth;
                 const winHeight = document.documentElement.clientHeight;
@@ -466,10 +608,9 @@
                 floatBtn.style.left = `${winWidth - config.floatBtnSize - config.safeMargin}px`;
                 floatBtn.style.top = `${winHeight - config.floatBtnSize - safeBottom - config.safeMargin}px`;
                 
-                // 初始化渲染公告
+                // 页面加载时初始化渲染公告
                 renderNotice();
             });
-
             window.addEventListener('resize', () => {
                 const winWidth = document.documentElement.clientWidth;
                 const winHeight = document.documentElement.clientHeight;
@@ -484,10 +625,6 @@
                     floatWindow.style.top = `${currentWindowPos.top}px`;
                 }
             });
-
-            // 暴露函数供按钮调用
-            window.handleDownload = handleDownload;
-            window.handleUpdate = handleUpdate;
         })();
     </script>
 </body>
