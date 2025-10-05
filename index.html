@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>悬浮功能面板（公告接收端）</title>
     <style>
-        /* 原有所有样式保持不变 */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei", sans-serif; }
         body { height: 100vh; overflow: hidden; position: relative; background: #f5f7fa; }
         
@@ -183,6 +182,23 @@
             color: white; 
             box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2); 
         }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+        .status-new {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .status-updated {
+            background: #d1fae5;
+            color: #065f46;
+        }
     </style>
 </head>
 <body>
@@ -216,7 +232,7 @@
         </div>
         <div class="content-panel" id="panelNotice">
             <div id="noticeContainer">
-                <div class="empty-tip" id="defaultTip">公告功能需对接"公告更新模块"<br>同步数据后可显示公告内容</div>
+                <div class="empty-tip" id="defaultTip">暂无最新公告<br>等待发送端发布更新</div>
                 <div class="notice-item" id="pushNotice"></div>
             </div>
         </div>
@@ -227,13 +243,11 @@
             <div class="empty-tip">设置功能待开发<br>敬请期待</div>
         </div>
     </div>
+
     <script>
         (function() {
             if (window.floatingWindowInjected) return;
             window.floatingWindowInjected = true;
-
-            console.log('=== 接收端开始加载 ===');
-            console.log('当前URL:', window.location.href);
 
             const config = { 
                 floatBtnSize: 60, 
@@ -261,23 +275,6 @@
                     const w = document.documentElement.clientWidth; 
                     const h = document.documentElement.clientHeight; 
                     return utils.checkWindowBound((w-config.windowWidth)/2, (h-config.windowHeight)/2); 
-                },
-                decodeData(encoded) {
-                    console.log('开始解码数据，编码长度:', encoded.length);
-                    try {
-                        const decoded = decodeURIComponent(atob(encoded));
-                        console.log('解码成功:', decoded);
-                        return JSON.parse(decoded);
-                    } catch (e) {
-                        console.error('解码失败:', e);
-                        throw e;
-                    }
-                },
-                getUrlParam(key) {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const value = urlParams.get(key);
-                    console.log(`获取URL参数 ${key}:`, value);
-                    return value;
                 }
             };
 
@@ -298,9 +295,9 @@
 
             let btnIsDragging = false, winIsDragging = false, isInMainPanel = true;
             let currentWindowPos = utils.getDefaultWindowPos();
+            let isUpdated = localStorage.getItem('noticeUpdated') === 'true';
 
             function switchContentPanel(targetId) {
-                console.log('切换面板到:', targetId);
                 funcButtons.style.display = 'none';
                 [panelMy, panelNotice, panelContact, panelSetting].forEach(panel => {
                     panel.classList.remove('active');
@@ -318,7 +315,6 @@
             }
 
             function backToMainPanel() {
-                console.log('返回主面板');
                 [panelMy, panelNotice, panelContact, panelSetting].forEach(panel => {
                     panel.classList.remove('active');
                     panel.style.display = 'none';
@@ -328,89 +324,61 @@
                 isInMainPanel = true;
             }
 
-            // 渲染公告
+            // 渲染公告 - 直接从localStorage读取
             function renderNotice() {
-                console.log('=== 开始渲染公告 ===');
-                const encodedNotice = utils.getUrlParam('notice');
-                const isUpdated = utils.getUrlParam('isUpdated') === '1';
-
-                console.log('encodedNotice:', encodedNotice);
-                console.log('isUpdated:', isUpdated);
-
-                if (!encodedNotice) {
-                    console.log('未找到notice参数，显示默认提示');
+                // 检查是否已经更新
+                if (isUpdated) {
+                    defaultTip.textContent = '已更新到最新版本';
                     defaultTip.style.display = 'block';
                     pushNotice.style.display = 'none';
                     return;
                 }
 
-                let noticeData;
-                try {
-                    noticeData = utils.decodeData(encodedNotice);
-                    console.log('公告数据解析成功:', noticeData);
-                } catch (e) {
-                    console.error('公告数据解析失败:', e);
-                    defaultTip.textContent = '公告数据解析失败，请检查推送URL';
-                    defaultTip.style.display = 'block';
-                    pushNotice.style.display = 'none';
-                    return;
-                }
-
-                // 数据完整性校验
-                console.log('开始数据完整性校验');
-                const requiredFields = ['title', 'date', 'content', 'downloadUrl', 'updateUrl', 'noticeId', 'senderUrl'];
-                const missingFields = requiredFields.filter(field => !noticeData[field]);
+                const noticeData = JSON.parse(localStorage.getItem('currentNotice'));
                 
-                if (missingFields.length > 0) {
-                    console.error('缺少必要字段:', missingFields);
-                    defaultTip.textContent = '公告数据不完整，请重新推送';
+                if (!noticeData) {
                     defaultTip.style.display = 'block';
                     pushNotice.style.display = 'none';
                     return;
                 }
 
-                console.log('所有字段检查通过，开始渲染公告');
-
-                pushNotice.className = isUpdated ? 'notice-item hidden' : 'notice-item';
                 defaultTip.style.display = 'none';
+                pushNotice.style.display = 'block';
 
                 pushNotice.innerHTML = `
-                    <div class="notice-title">${noticeData.title}</div>
+                    <div class="notice-title">
+                        ${noticeData.title}
+                        <span class="status-badge status-new">NEW</span>
+                    </div>
                     <div class="notice-time">更新时间：${noticeData.date}</div>
                     <div class="notice-content">${noticeData.content}</div>
                     <div class="notice-actions">
-                        <button class="action-btn download-btn" onclick="window.open('${noticeData.downloadUrl}', '_blank')">下载</button>
-                        <button class="action-btn update-btn" onclick="handleUpdate('${noticeData.updateUrl}', '${noticeData.noticeId}', '${noticeData.senderUrl}')">更新</button>
+                        <button class="action-btn download-btn" onclick="handleDownload('${noticeData.downloadUrl}')">下载</button>
+                        <button class="action-btn update-btn" onclick="handleUpdate('${noticeData.updateUrl}', '${noticeData.noticeId}')">更新</button>
                     </div>
                 `;
-                
-                console.log('公告渲染完成');
             }
 
-            // 点击更新自动回调发送端
-            function handleUpdate(updateUrl, noticeId, senderUrl) {
-                console.log('=== 开始处理更新 ===');
-                console.log('updateUrl:', updateUrl);
-                console.log('noticeId:', noticeId);
-                console.log('senderUrl:', senderUrl);
-                
-                // 1. 跳转用户更新链接
-                console.log('跳转到更新链接:', updateUrl);
+            // 下载处理
+            function handleDownload(downloadUrl) {
+                window.open(downloadUrl, '_blank');
+                // 下载后公告不消失
+            }
+
+            // 更新处理
+            function handleUpdate(updateUrl, noticeId) {
+                // 1. 跳转更新链接
                 window.open(updateUrl, '_blank');
                 
-                // 2. 接收端自身隐藏公告
-                const currentUrl = window.location.href.split('?')[0];
-                const updatedUrl = `${currentUrl}?notice=${utils.getUrlParam('notice')}&noticeId=${noticeId}&isUpdated=1`;
-                console.log('更新接收端URL:', updatedUrl);
-                window.location.href = updatedUrl;
+                // 2. 标记为已更新
+                localStorage.setItem('noticeUpdated', 'true');
+                isUpdated = true;
                 
-                // 3. 自动打开发送端回调URL
-                const senderCallbackUrl = `${senderUrl}?noticeId=${noticeId}&isUpdated=1`;
-                console.log('回调发送端URL:', senderCallbackUrl);
-                window.open(senderCallbackUrl, '_blank');
+                // 3. 重新渲染公告（会显示"已更新"）
+                renderNotice();
                 
-                // 4. 友好提示
-                alert('更新完成！公告已隐藏\n\n已自动通知发送端，无需手动操作');
+                // 4. 提示用户
+                alert('更新完成！公告已标记为已更新。');
             }
 
             // 原有悬浮窗、拖拽、按钮绑定逻辑
@@ -491,13 +459,14 @@
             btnSetting.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelSetting'); });
 
             window.addEventListener('load', () => {
-                console.log('=== 页面加载完成 ===');
                 const winWidth = document.documentElement.clientWidth;
                 const winHeight = document.documentElement.clientHeight;
                 const safeBottom = utils.getSafeBottom();
                 
                 floatBtn.style.left = `${winWidth - config.floatBtnSize - config.safeMargin}px`;
                 floatBtn.style.top = `${winHeight - config.floatBtnSize - safeBottom - config.safeMargin}px`;
+                
+                // 初始化渲染公告
                 renderNotice();
             });
 
@@ -516,10 +485,9 @@
                 }
             });
 
-            // 暴露更新函数供按钮调用
+            // 暴露函数供按钮调用
+            window.handleDownload = handleDownload;
             window.handleUpdate = handleUpdate;
-            
-            console.log('=== 接收端初始化完成 ===');
         })();
     </script>
 </body>
