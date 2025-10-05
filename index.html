@@ -232,6 +232,9 @@
             if (window.floatingWindowInjected) return;
             window.floatingWindowInjected = true;
 
+            console.log('=== 接收端开始加载 ===');
+            console.log('当前URL:', window.location.href);
+
             const config = { 
                 floatBtnSize: 60, 
                 safeMargin: 20, 
@@ -260,11 +263,21 @@
                     return utils.checkWindowBound((w-config.windowWidth)/2, (h-config.windowHeight)/2); 
                 },
                 decodeData(encoded) {
-                    return JSON.parse(decodeURIComponent(atob(encoded)));
+                    console.log('开始解码数据，编码长度:', encoded.length);
+                    try {
+                        const decoded = decodeURIComponent(atob(encoded));
+                        console.log('解码成功:', decoded);
+                        return JSON.parse(decoded);
+                    } catch (e) {
+                        console.error('解码失败:', e);
+                        throw e;
+                    }
                 },
                 getUrlParam(key) {
                     const urlParams = new URLSearchParams(window.location.search);
-                    return urlParams.get(key);
+                    const value = urlParams.get(key);
+                    console.log(`获取URL参数 ${key}:`, value);
+                    return value;
                 }
             };
 
@@ -287,6 +300,7 @@
             let currentWindowPos = utils.getDefaultWindowPos();
 
             function switchContentPanel(targetId) {
+                console.log('切换面板到:', targetId);
                 funcButtons.style.display = 'none';
                 [panelMy, panelNotice, panelContact, panelSetting].forEach(panel => {
                     panel.classList.remove('active');
@@ -304,6 +318,7 @@
             }
 
             function backToMainPanel() {
+                console.log('返回主面板');
                 [panelMy, panelNotice, panelContact, panelSetting].forEach(panel => {
                     panel.classList.remove('active');
                     panel.style.display = 'none';
@@ -315,10 +330,15 @@
 
             // 渲染公告
             function renderNotice() {
+                console.log('=== 开始渲染公告 ===');
                 const encodedNotice = utils.getUrlParam('notice');
                 const isUpdated = utils.getUrlParam('isUpdated') === '1';
 
+                console.log('encodedNotice:', encodedNotice);
+                console.log('isUpdated:', isUpdated);
+
                 if (!encodedNotice) {
+                    console.log('未找到notice参数，显示默认提示');
                     defaultTip.style.display = 'block';
                     pushNotice.style.display = 'none';
                     return;
@@ -327,7 +347,9 @@
                 let noticeData;
                 try {
                     noticeData = utils.decodeData(encodedNotice);
+                    console.log('公告数据解析成功:', noticeData);
                 } catch (e) {
+                    console.error('公告数据解析失败:', e);
                     defaultTip.textContent = '公告数据解析失败，请检查推送URL';
                     defaultTip.style.display = 'block';
                     pushNotice.style.display = 'none';
@@ -335,12 +357,19 @@
                 }
 
                 // 数据完整性校验
-                if (!noticeData.title || !noticeData.date || !noticeData.content || !noticeData.downloadUrl || !noticeData.updateUrl || !noticeData.noticeId || !noticeData.senderUrl) {
+                console.log('开始数据完整性校验');
+                const requiredFields = ['title', 'date', 'content', 'downloadUrl', 'updateUrl', 'noticeId', 'senderUrl'];
+                const missingFields = requiredFields.filter(field => !noticeData[field]);
+                
+                if (missingFields.length > 0) {
+                    console.error('缺少必要字段:', missingFields);
                     defaultTip.textContent = '公告数据不完整，请重新推送';
                     defaultTip.style.display = 'block';
                     pushNotice.style.display = 'none';
                     return;
                 }
+
+                console.log('所有字段检查通过，开始渲染公告');
 
                 pushNotice.className = isUpdated ? 'notice-item hidden' : 'notice-item';
                 defaultTip.style.display = 'none';
@@ -354,20 +383,30 @@
                         <button class="action-btn update-btn" onclick="handleUpdate('${noticeData.updateUrl}', '${noticeData.noticeId}', '${noticeData.senderUrl}')">更新</button>
                     </div>
                 `;
+                
+                console.log('公告渲染完成');
             }
 
             // 点击更新自动回调发送端
             function handleUpdate(updateUrl, noticeId, senderUrl) {
+                console.log('=== 开始处理更新 ===');
+                console.log('updateUrl:', updateUrl);
+                console.log('noticeId:', noticeId);
+                console.log('senderUrl:', senderUrl);
+                
                 // 1. 跳转用户更新链接
+                console.log('跳转到更新链接:', updateUrl);
                 window.open(updateUrl, '_blank');
                 
                 // 2. 接收端自身隐藏公告
                 const currentUrl = window.location.href.split('?')[0];
                 const updatedUrl = `${currentUrl}?notice=${utils.getUrlParam('notice')}&noticeId=${noticeId}&isUpdated=1`;
+                console.log('更新接收端URL:', updatedUrl);
                 window.location.href = updatedUrl;
                 
                 // 3. 自动打开发送端回调URL
                 const senderCallbackUrl = `${senderUrl}?noticeId=${noticeId}&isUpdated=1`;
+                console.log('回调发送端URL:', senderCallbackUrl);
                 window.open(senderCallbackUrl, '_blank');
                 
                 // 4. 友好提示
@@ -452,6 +491,7 @@
             btnSetting.addEventListener('click', (e) => { e.stopPropagation(); switchContentPanel('panelSetting'); });
 
             window.addEventListener('load', () => {
+                console.log('=== 页面加载完成 ===');
                 const winWidth = document.documentElement.clientWidth;
                 const winHeight = document.documentElement.clientHeight;
                 const safeBottom = utils.getSafeBottom();
@@ -478,6 +518,8 @@
 
             // 暴露更新函数供按钮调用
             window.handleUpdate = handleUpdate;
+            
+            console.log('=== 接收端初始化完成 ===');
         })();
     </script>
 </body>
