@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>悬浮功能面板（哈希存储版）</title>
+    <title>悬浮功能面板（Y接收端·哈希同步）</title>
     <style>
-        /* 原有样式100%保留，仅新增哈希解析逻辑 */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei", sans-serif; }
         body { height: 100vh; overflow: hidden; position: relative; background: #f5f7fa; }
         
-        /* 核心：HTML渲染容器（iframe，无本地存储） */
+        /* HTML渲染容器（全屏，无占位） */
         .html-render-container {
             position: absolute;
             top: 0;
@@ -31,7 +30,7 @@
             display: none;
         }
 
-        /* 原有样式：完全保留，未修改任何一行 */
+        /* 原有悬浮窗样式：100%保留 */
         .float-btn { 
             position: fixed; 
             z-index: 1002; 
@@ -250,16 +249,15 @@
     </style>
 </head>
 <body>
-    <!-- 核心：HTML渲染容器（iframe，无本地存储） -->
+    <!-- HTML渲染容器（全屏，加载发送端的HTML链接） -->
     <iframe class="html-render-container" id="htmlRenderIframe" onload="hideLoadTip()" onerror="showErrorTip()"></iframe>
-    <!-- 简洁加载提示 -->
     <div class="load-tip" id="loadTip">加载HTML中...</div>
 
-    <!-- 原有结构：完全保留，未增删任何元素 -->
+    <!-- 原有悬浮窗结构：完全保留 -->
     <button class="float-btn" id="floatBtn"></button>
     <div class="float-window" id="floatWindow">
         <div class="window-header" id="windowHeader">
-            功能面板（哈希存储版）
+            功能面板（Y接收端）
             <button class="modal-back" id="modalBack">返回</button>
         </div>
         <div class="func-buttons" id="funcButtons">
@@ -268,8 +266,8 @@
                 <img src="https://img.icons8.com/ios-glyphs/30/666/user--v1.png" class="btn-icon" alt="我的">
             </button>
             <button class="func-btn" id="btnNotice">
-                <span>HTML更新</span>
-                <img src="https://img.icons8.com/ios-glyphs/30/666/announcement--v1.png" class="btn-icon" alt="HTML更新">
+                <span>公告更新</span>
+                <img src="https://img.icons8.com/ios-glyphs/30/666/announcement--v1.png" class="btn-icon" alt="公告更新">
             </button>
             <button class="func-btn" id="btnContact">
                 <span>联系作者</span>
@@ -286,7 +284,7 @@
         </div>
         <div class="content-panel" id="panelNotice">
             <div id="noticeContainer">
-                <div class="empty-tip" id="defaultTip">暂无HTML链接<br>等待发送端传递（哈希存储）</div>
+                <div class="empty-tip" id="defaultTip">暂无公告<br>等待发送端发布（哈希同步）</div>
                 <div class="notice-item" id="pushNotice"></div>
             </div>
         </div>
@@ -309,7 +307,7 @@
                 windowHeight: 280 
             };
             
-            // 工具函数：完全保留原有逻辑
+            // 工具函数：保留原有
             const utils = {
                 getSafeBottom() { 
                     const p = parseFloat(getComputedStyle(document.body).paddingBottom); 
@@ -331,7 +329,7 @@
                 }
             };
 
-            // 元素引用：新增哈希解析相关元素
+            // 元素引用：保留原有+新增HTML渲染元素
             const floatBtn = document.getElementById('floatBtn');
             const floatWindow = document.getElementById('floatWindow');
             const modalBack = document.getElementById('modalBack');
@@ -349,40 +347,39 @@
             const htmlRenderIframe = document.getElementById('htmlRenderIframe');
             const loadTip = document.getElementById('loadTip');
 
-            // 状态变量：改用URL哈希存储HTML链接，内存变量仅作临时存储
+            // 状态变量：纯内存+哈希，无本地存储
             let btnIsDragging = false, winIsDragging = false, isInMainPanel = true;
             let currentWindowPos = utils.getDefaultWindowPos();
-            let isUpdated = false; // 内存标记，无本地残留
-            let currentHtmlData = null; // 内存存储当前哈希中的数据
+            let isUpdated = false; // 标记是否已加载HTML
+            let currentNoticeData = null; // 存储从哈希解析的公告数据
             let downloadInterval = null;
 
-            // 核心：从URL哈希中解析HTML链接
-            function parseHashForHtmlLink() {
+            // 核心1：从URL哈希解析发送端的公告数据（关键！解决“无公告”问题）
+            function parseNoticeFromHash() {
                 const hash = window.location.hash.slice(1); // 移除#
                 if (!hash) return null;
                 const params = new URLSearchParams(hash);
-                const htmlLink = params.get('htmlLink');
-                if (!htmlLink) return null;
+                // 与发送端字段完全匹配（title/date/content/resourceUrl）
                 return {
-                    htmlLink: decodeURIComponent(htmlLink),
-                    date: new Date().getFullYear() + '年' + (new Date().getMonth()+1) + '月' + new Date().getDate() + '日'
+                    title: decodeURIComponent(params.get('title') || ''),
+                    date: params.get('date') || '',
+                    content: decodeURIComponent(params.get('content') || ''),
+                    resourceUrl: decodeURIComponent(params.get('resourceUrl') || ''),
+                    noticeId: params.get('noticeId')
                 };
             }
 
-            // 全局变量：供发送端传递HTML链接（修改URL哈希）
-            window.setHtmlUpdateData = function(htmlLink) {
-                // 编码URL，避免特殊字符问题
-                const encodedLink = encodeURIComponent(htmlLink);
-                // 修改URL哈希，触发页面状态更新
-                window.history.replaceState(null, '', `#htmlLink=${encodedLink}`);
-                // 自动刷新公告面板
-                if (panelNotice.classList.contains('active')) {
-                    alert('收到发送端的HTML链接（哈希存储）！');
-                    renderNotice();
-                }
-            };
+            // 核心2：加载HTML链接（渲染发送端的HTML文件/链接）
+            function loadHtmlFromLink(htmlLink) {
+                loadTip.style.display = 'block';
+                loadTip.textContent = '加载HTML中...';
+                htmlRenderIframe.style.display = 'block';
+                htmlRenderIframe.src = htmlLink; // 直接加载哈希中的HTML链接
+            }
+            function hideLoadTip() { loadTip.style.display = 'none'; }
+            function showErrorTip() { loadTip.textContent = 'HTML加载失败，请检查发送端链接'; }
 
-            // 面板切换逻辑：完全保留原有逻辑
+            // 面板切换：保留原有逻辑
             function switchContentPanel(targetId) {
                 funcButtons.style.display = 'none';
                 [panelMy, panelNotice, panelContact, panelSetting].forEach(panel => {
@@ -395,7 +392,7 @@
                 modalBack.style.display = 'block';
                 isInMainPanel = false;
                 if (targetId === 'panelNotice') {
-                    renderNotice();
+                    renderNotice(); // 切换到公告面板时立即渲染
                 }
             }
             function backToMainPanel() {
@@ -408,46 +405,32 @@
                 isInMainPanel = true;
             }
 
-            // 核心：加载HTML链接（哈希存储版）
-            function loadHtmlFromLink(htmlLink) {
-                loadTip.style.display = 'block';
-                loadTip.textContent = '加载HTML中...';
-                htmlRenderIframe.style.display = 'block';
-                htmlRenderIframe.src = htmlLink; // 直接加载哈希中的链接
-            }
-            function hideLoadTip() { loadTip.style.display = 'none'; }
-            function showErrorTip() { loadTip.textContent = 'HTML加载失败，请检查链接'; }
-
-            // 公告渲染：从URL哈希中读取数据
+            // 核心3：渲染公告（从哈希读取数据，解决“无公告”）
             function renderNotice() {
-                // 从URL哈希中解析最新数据
-                currentHtmlData = parseHashForHtmlLink();
-                if (currentHtmlData) {
-                    isUpdated = false;
-                }
+                // 从哈希更新最新公告数据
+                currentNoticeData = parseNoticeFromHash();
 
+                // 已更新状态
                 if (isUpdated) {
-                    defaultTip.textContent = '已加载HTML链接内容（哈希存储）';
+                    defaultTip.textContent = '已加载最新HTML内容';
                     defaultTip.style.display = 'block';
                     pushNotice.style.display = 'none';
                     return;
                 }
-                if (!currentHtmlData || !currentHtmlData.htmlLink) {
+                // 无公告（哈希为空）
+                if (!currentNoticeData || !currentNoticeData.title) {
                     defaultTip.style.display = 'block';
                     pushNotice.style.display = 'none';
                     return;
                 }
-                // 原有面板布局：完全保留
+                // 有公告：渲染发送端数据
                 pushNotice.innerHTML = `
                     <div class="notice-title">
-                        HTML更新内容
+                        ${currentNoticeData.title}
                         <span class="status-badge status-new">NEW</span>
                     </div>
-                    <div class="notice-time">更新时间：${currentHtmlData.date}</div>
-                    <div class="notice-content">
-                        HTML链接：<span style="font-size: 12px; word-break: break-all;">${currentHtmlData.htmlLink}</span><br>
-                        点击“下载”→“更新”加载链接内容
-                    </div>
+                    <div class="notice-time">更新时间：${currentNoticeData.date}</div>
+                    <div class="notice-content">${currentNoticeData.content}</div>
                     <div class="progress-actions">
                         <div class="progress-left">
                             <div class="download-progress">
@@ -465,10 +448,11 @@
                 const downloadProgress = pushNotice.querySelector('.download-progress');
                 const progressBar = pushNotice.querySelector('.progress-bar');
 
+                // 初始状态
                 downloadProgress.style.display = 'none';
                 updateBtn.style.display = 'none';
 
-                // 下载事件：完全保留原有逻辑（模拟加载）
+                // 下载事件（模拟进度）
                 downloadBtn.addEventListener('click', () => {
                     if (downloadInterval) return;
                     downloadProgress.style.display = 'block';
@@ -492,26 +476,32 @@
                     }, 30);
                 });
 
-                // 更新事件：加载哈希中的HTML链接
+                // 更新事件：加载HTML链接
                 updateBtn.addEventListener('click', () => {
                     isUpdated = true;
                     renderNotice();
-                    loadHtmlFromLink(currentHtmlData.htmlLink);
+                    loadHtmlFromLink(currentNoticeData.resourceUrl); // 从哈希数据加载
                 });
 
+                // 显示公告
                 defaultTip.style.display = 'none';
                 pushNotice.style.display = 'block';
             }
 
-            // 监听哈希变化，自动刷新公告面板
+            // 监听哈希变化：发送端发布/清除公告时，自动刷新（关键！）
             window.addEventListener('hashchange', () => {
+                isUpdated = false; // 新公告需重新下载
+                // 若当前在公告面板，立即渲染
                 if (panelNotice.classList.contains('active')) {
-                    alert('检测到哈希变化，自动刷新HTML链接！');
+                    alert('检测到新公告，自动更新！');
                     renderNotice();
                 }
+                // 重置HTML容器（新公告需重新加载）
+                htmlRenderIframe.style.display = 'none';
+                htmlRenderIframe.src = '';
             });
 
-            // 原有交互逻辑：完全保留，无任何修改
+            // 原有交互逻辑：完全保留
             floatBtn.addEventListener('click', () => {
                 if (btnIsDragging) return;
                 floatWindow.classList.toggle('active');
@@ -574,9 +564,9 @@
                 const safeBottom = utils.getSafeBottom();
                 floatBtn.style.left = `${winW - 60 - 20}px`;
                 floatBtn.style.top = `${winH - 60 - safeBottom - 20}px`;
-                // 初始化解析URL哈希
-                currentHtmlData = parseHashForHtmlLink();
-                renderNotice(); // 初始渲染，无本地数据
+                // 页面加载时从哈希读取公告（首次加载不遗漏）
+                currentNoticeData = parseNoticeFromHash();
+                renderNotice();
             });
             window.addEventListener('resize', () => {
                 const winW = document.documentElement.clientWidth;
